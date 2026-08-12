@@ -1,0 +1,8 @@
+safe_x0=570
+safe_y0=5
+safe_x1=1990
+safe_y1=1420
+safe_w=1420
+safe_h=1415
+img_W=2752
+img_H=1536

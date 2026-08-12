@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Batch Download All 11 Materials</title>
+</head>
+<body>
+<h2>Generating 11 images...</h2>
+<pre id="status">Loading...</pre>
+<script>
+const PROMPT = "3D cartoon cute wizard boy flying in cosmic space, brown hair with freckles, wearing purple witch hat and flowing purple robe, white headphones around neck, blue and purple striped necktie, black pants and boots, right hand holding silver magic wand with white star on top casting golden sparkles trail, left hand cupping glowing transparent crystal ball with shining five-pointed star inside, deep indigo and dark purple starry sky background with nebula, planets and shooting stars, floating blue crystal columns, futuristic sci-fi crystal architecture platforms, UFO shaped spaceships, magical golden light rays and glitter sparkles everywhere, C4D render, Octane render, ultra detailed, cinematic lighting, magical fantasy sci-fi atmosphere, vibrant colors, 8k quality";
+const API = "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image";
+
+const JOBS = [
+  { name: "kv_wechat_cover",  size: "landscape_4_3" },
+  { name: "kv_xhs_portrait",  size: "portrait_4_3" },
+  { name: "kv_xhs_square",    size: "square" },
+  { name: "kv_douyin",        size: "portrait_16_9" },
+  { name: "kv_bilibili",      size: "landscape_16_9" },
+  { name: "kv_h5",            size: "portrait_16_9" },
+  { name: "kv_banner",        size: "landscape_16_9" },
+  { name: "kv_poster",        size: "portrait_4_3" },
+  { name: "kv_poster_v",      size: "portrait_16_9" },
+  { name: "kv_rollup",        size: "portrait_16_9" },
+  { name: "kv_board",         size: "landscape_4_3" },
+];
+
+function makeURL(size) {
+  return API + "?prompt=" + encodeURIComponent(PROMPT) + "&image_size=" + size;
+}
+
+async function fetchOne(job) {
+  const url = makeURL(job.size);
+  const resp = await fetch(url, { credentials: "include", mode: "cors" });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${job.name}`);
+  const blob = await resp.blob();
+  // Try type check
+  if (!blob.type.startsWith("image/")) {
+    const txt = await blob.text().catch(()=>"");
+    throw new Error(`Non-image ${job.name}: ${blob.type} | ${txt.slice(0,200)}`);
+  }
+  const buf = await new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result); // data URL
+    fr.onerror = rej;
+    fr.readAsDataURL(blob);
+  });
+  // buf is "data:image/xxx;base64,XXXXXXXX" — we strip header later in caller
+  return { name: job.name, size: job.size, ok: true, dataUrl: buf, sizeBytes: blob.size };
+}
+
+window.runAll = async function() {
+  const status = document.getElementById("status");
+  const results = [];
+  // Sequential to avoid rate limit issues
+  for (let i = 0; i < JOBS.length; i++) {
+    const job = JOBS[i];
+    status.textContent += `\n[${i+1}/${JOBS.length}] Fetching ${job.name} (${job.size}) ...`;
+    try {
+      // Small delay between requests to be safe
+      if (i > 0) await new Promise(r => setTimeout(r, 1500));
+      const r = await fetchOne(job);
+      results.push(r);
+      status.textContent += ` OK (${(r.sizeBytes/1024).toFixed(1)} KB)`;
+    } catch (e) {
+      results.push({ name: job.name, size: job.size, ok: false, error: String(e) });
+      status.textContent += ` FAIL: ${e.message || e}`;
+    }
+  }
+  status.textContent += `\n\n=== DONE: ${results.filter(r=>r.ok).length}/${JOBS.length} OK ===`;
+  return results;
+};
+</script>
+</body>
+</html>
